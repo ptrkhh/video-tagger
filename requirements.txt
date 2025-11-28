@@ -1,0 +1,9 @@
+# Core Google Cloud and Vertex AI dependencies
+google-cloud-aiplatform>=1.38.0
+vertexai>=0.0.1
+
+# Retry logic with exponential backoff
+tenacity>=8.2.0
+
+# Progress bar for better user experience
+tqdm>=4.66.0
