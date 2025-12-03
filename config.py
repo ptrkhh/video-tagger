@@ -14,7 +14,7 @@ class Config:
     model_name: str = "gemini-2.5-flash"
     prompt_file_path: str = "prompt.txt"
 
-    maximum_concurrent_workers: int = 5
+    max_workers: int = 1
 
     maximum_file_size_mb: int = 100
 
@@ -27,8 +27,8 @@ class Config:
     retry_minimum_wait_seconds: int = 2
     retry_maximum_wait_seconds: int = 30
 
-    minimum_response_length_characters: int = 10
-    maximum_response_length_characters: int = 500
+    minimum_response_length_characters: int = 80
+    maximum_response_length_characters: int = 200
 
     supported_video_extensions: ClassVar[list[str]] = [".mp4", ".avi", ".mov", ".webm"]
     supported_image_extensions: ClassVar[list[str]] = [".jpg", ".jpeg", ".png", ".heic", ".webp"]

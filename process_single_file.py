@@ -1,19 +1,18 @@
 import os
 from pathlib import Path
 
-from google.genai.types import Part
-
 from analyze_media_content import analyze_media_content
 from build_filename import build_filename
 from clean_and_validate_keywords import clean_and_validate_keywords
 from config import application_config
 from extract_source_from_filename import extract_username_from_filename
-from get_mime_type import get_mime_type
 
 
 def generate_new_filename(original_path: Path, gemini_response: str) -> str:
     source = extract_username_from_filename(original_path.name)
+    print(f"  Source: {source}")
     keywords = clean_and_validate_keywords(gemini_response)
+    print(f"  Keywords: {keywords}")
     new_filename = build_filename(source, keywords, original_path.suffix)
     return new_filename
 
@@ -32,11 +31,6 @@ def process_single_file(file_path: Path) -> bool:
                 f"Gemini response too short ({len(response)} chars, "
                 f"minimum {minimum_length}): {response}"
             )
-
-        maximum_length = application_config.maximum_response_length_characters
-        if len(response) > maximum_length:
-            print(f"  ⚠️  Response very long ({len(response)} chars), "
-                  f"may be truncated in filename")
 
         print(f"Keywords generated for {file_path.name}: {len(response)} chars")
 
