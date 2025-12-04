@@ -5,7 +5,7 @@ from analyze_media_content import analyze_media_content
 from build_filename import build_filename
 from clean_and_validate_keywords import clean_and_validate_keywords
 from config import application_config
-from extract_source_from_filename import extract_username_from_filename
+from extract_username_from_filename import extract_username_from_filename
 
 
 def generate_new_filename(original_path: Path, gemini_response: str) -> str:

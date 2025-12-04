@@ -1,7 +1,6 @@
 import time
 from pathlib import Path
 
-from google.genai import Client
 from google.genai.types import Part, GenerateContentConfig
 
 import config
@@ -9,44 +8,57 @@ from get_mime_type import get_mime_type
 
 
 def analyze_media_content(file_path: Path):
+    system_instruction = """
+ROLE: You are an automated file archivist for an automotive media library.
+
+OBJECTIVE: Generate a single string of space-separated keywords to be used as a filename. You MUST fill the filename buffer (target: 230-254 characters) with the most likely search terms.
+
+CRITICAL CONSTRAINTS:
+
+NO CONVERSATION: Do not write "Here are the keywords." Do not use "sure." Do not use markdown code blocks. Start directly with the first keyword. Any extra text will break the script.
+
+TRANSCRIPTION (OCR): If the image contains text (titles, subtitles, memes, stickers), you must include it.
+
+OUTPUT FORMAT: Lowercase, space-separated only. NO punctuation, NO file extensions.
+
+LENGTH: Strictly 230-254 characters.
+    """
 
     prompt = """
-Generate STRATEGIC search keywords for this automotive media.
+CRITICAL "GREP" RULES:
 
-CRITICAL REQUIREMENT: Your response MUST be between 200-400 characters. This is a strict requirement.
+Substring Exclusion: Strictly check for redundancy. If a word is a substring of a longer word, omit the shorter word.
+  - If you include "kecelakaan", DO NOT include "celaka"
+  - If you include "racing", DO NOT include "race"
+  - If you include "automotive", DO NOT include "auto"
 
-FOCUS ON:
-1. Brand/model identification (use common abbreviations/nicknames)
-2. Key distinguishing features (1-3 terms max)
-3. Content type (only if not obvious): meme, review, comparison, accident
-4. Selective bilingual (pick most searchable term per concept, not both)
-5. Local slang when relevant (mercy=Mercedes, mobcin=Chinese car)
+Synonym Stacking: Include distinct synonyms (English, Indonesian, Slang) to maximize search hits.
+  - good: "crash nabrak collision"
+  - good: "boros wasteful pemborosan"
 
-AVOID:
-- Exhaustive synonym lists
-- Redundant translations
-- Repetitive descriptors
-- Long narratives
+Priority Sorting: Most important keywords (Brand, Model, Main Event) must come first. Lower priority descriptors go last.
 
-EXAMPLES (note the length - aim for similar):
-• Meme about Mercedes fuel consumption: "mercedes w211 eclass bbm boros fuel consumption dashboard comparison meme funny expensive maintenance costs reliability german engineering luxury sedan"
-• Audi with Sonic sticker: "audi sonic sticker modifikasi custom funny creative automotive humor pop culture reference blue hedgehog sega gaming crossover unexpected modification quirky"
-• License plate math pun: "license plate plat nomor multiplication perkalian math pun helpful educational clever wordplay indonesia traffic humor mathematical joke creative license plate design unique"
-• Mazda vs Wuling comparison: "mazda cx5 wuling almaz comparison suv saling nyindir meme rivalry brand comparison japanese indonesian automotive market competition price value features specification review"
+CONTENT PRIORITY:
+1. Identity: Brand, Model, Chassis Code (e.g., w204, g20), common nicknames (e.g., mobcin, mercy)
+2. Action/Genre: Review, crash, drag race, meme, funny
+3. Visible Text/Title: Transcription of any text in the image
+4. Distinct Synonyms: (e.g., "boros" + "wasteful", "kencang" + "fast")
+5. Context: Location (if relevant), specific modification parts (e.g., turbo, spoiler)
 
-FORMAT: Space-separated lowercase keywords. Generate enough keywords to reach 150-400 characters total.
+EXAMPLES (Follow this density):
 
-Count your output to ensure it meets the 150-400 character requirement before responding.
+Input: A thumbnail with text "CIVIC TURBO LAWAN XPENDER!!"
+Output: honda civic turbo fk8 vs mitsubishi xpander cross drag race adu mekanik lawan rivalry fwd battle acceleration kencang fast speed tuning modifikasi mpv sedan hatchback jdm funny judul clickbait thumbnail text viral trending youtube indonesia
 
-Now analyze this media and generate strategic keywords:
+Input: A photo of a Suzuki Jimny with a "4x4 Life" sticker mudding
+Output: suzuki jimny jb74 katana sierra 4x4 life sticker decal offroad lumpur mudding stuck kepater recovery winch arb forest hutan adventure camping overland mini jeep kei car legendary ladder frame solid axle suspension lift kit modification accessories
+
+Input: Meme text "Me waiting for parts"
+Output: me waiting for parts text caption meme funny relatable sparepart onderdil lama shipping delay project car builds unfinished jackstand bengkel garage mechanic pain suffering patience import customs bea cukai tax mahal expensive hobby automotive enthusiast struggle
+
+ANALYZE THIS MEDIA AND OUTPUT KEYWORDS:
     """
-    client = Client(
-        location=config.application_config.gcp_region,
-        project=config.application_config.gcp_project_id,
-        vertexai=True,
-    )
 
-    # Read file content and create Part using from_bytes for Vertex AI
     with open(file_path, 'rb') as f:
         file_data = f.read()
 
@@ -54,62 +66,45 @@ Now analyze this media and generate strategic keywords:
     media_part = Part.from_bytes(data=file_data, mime_type=mime_type)
 
     max_retries = 3
-    retry_delay = 2
-
     for attempt in range(max_retries):
         try:
-            # Add rate limiting delay to avoid hitting API limits
-            if attempt > 0:
-                wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
-                print(f"  Retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...")
-                time.sleep(wait_time)
-            else:
-                # Small delay even on first attempt to respect rate limits
-                time.sleep(1)
-
-            response = client.models.generate_content(
-                model=config.application_config.model_name,
+            response = config.application_config.client.models.generate_content(
+                model="gemini-2.5-flash",
                 contents=[media_part, prompt],
                 config=GenerateContentConfig(
                     temperature=0.8,
-                    max_output_tokens=500,
+                    max_output_tokens=1000,
                     top_p=0.95,
-                    top_k=40
+                    top_k=40,
+                    system_instruction=system_instruction
                 )
             )
 
-            # Validate response immediately after getting it
             if not response:
                 raise ValueError("Response is None")
 
-            if not hasattr(response, 'candidates') or not response.candidates:
-                if hasattr(response, 'prompt_feedback'):
-                    raise ValueError(f"No candidates. Prompt feedback: {response.prompt_feedback}")
-                raise ValueError("No candidates in response")
+            if not hasattr(response, 'text') or not response.text:
+                if not hasattr(response, 'candidates') or not response.candidates:
+                    if hasattr(response, 'prompt_feedback'):
+                        raise ValueError(f"No candidates. Prompt feedback: {response.prompt_feedback}")
+                    raise ValueError("No candidates in response")
 
-            candidate = response.candidates[0]
+                candidate = response.candidates[0]
 
-            # Check for blocked content
-            if hasattr(candidate, 'finish_reason'):
-                finish_reason = str(candidate.finish_reason)
-                if 'SAFETY' in finish_reason or 'BLOCKED' in finish_reason:
-                    raise ValueError(f"Content blocked by safety filters: {finish_reason}")
+                if hasattr(candidate, 'finish_reason'):
+                    finish_reason = str(candidate.finish_reason)
+                    if 'SAFETY' in finish_reason or 'BLOCKED' in finish_reason:
+                        raise ValueError(f"Content blocked by safety filters: {finish_reason}")
 
-            if not hasattr(candidate, 'content') or not candidate.content:
-                raise ValueError(f"No content in candidate. Finish reason: {getattr(candidate, 'finish_reason', 'unknown')}")
+                if not hasattr(candidate, 'content') or not candidate.content:
+                    raise ValueError(
+                        f"No content in candidate. Finish reason: {getattr(candidate, 'finish_reason', 'unknown')}")
 
-            if not hasattr(candidate.content, 'parts') or not candidate.content.parts:
-                raise ValueError("No parts in response content")
+                raise ValueError("No text in response")
 
-            part = candidate.content.parts[0]
-            if not hasattr(part, 'text') or not part.text:
-                raise ValueError("No text in response part")
-
-            response_text = part.text.strip()
+            response_text = response.text.strip()
             if len(response_text) < 80:
                 raise ValueError(f"Response too short ({len(response_text)} chars), retrying...")
-
-            # Success - return the response
             return response
 
         except Exception as e:
@@ -117,8 +112,6 @@ Now analyze this media and generate strategic keywords:
             if attempt < max_retries - 1:
                 print(f"  ⚠️  Attempt {attempt + 1} failed: {error_msg}")
             else:
-                # Last attempt failed
                 raise ValueError(f"API call failed after {max_retries} attempts: {error_msg}")
 
-    # Should never reach here, but just in case
     raise ValueError(f"API call failed after {max_retries} attempts")

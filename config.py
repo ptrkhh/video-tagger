@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
+from google.genai import Client
+
 
 @dataclass
 class Config:
@@ -13,6 +15,7 @@ class Config:
 
     model_name: str = "gemini-2.5-flash"
     prompt_file_path: str = "prompt.txt"
+    use_ai_to_get_username: bool = False
 
     max_workers: int = 1
 
@@ -34,6 +37,12 @@ class Config:
     supported_image_extensions: ClassVar[list[str]] = [".jpg", ".jpeg", ".png", ".heic", ".webp"]
 
     generic_source_keywords: ClassVar[list[str]] = ["img", "image", "pic", "photo", "video", "vid", "screenshot"]
+
+    client = Client(
+        location=gcp_region,
+        project=gcp_project_id,
+        vertexai=True,
+    )
 
     def get_all_supported_media_extensions(self) -> list[str]:
         return self.supported_video_extensions + self.supported_image_extensions
