@@ -39,7 +39,7 @@ def extract_username_from_filename(filename: str) -> Optional[str]:
                     contents=[prompt],
                     config=GenerateContentConfig(
                         temperature=0.0,
-                        max_output_tokens=1000,
+                        max_output_tokens=10000,
                         top_p=1.0,
                         top_k=1
                     )
@@ -62,7 +62,7 @@ def extract_username_from_filename(filename: str) -> Optional[str]:
                         if 'SAFETY' in finish_reason or 'BLOCKED' in finish_reason:
                             raise ValueError(f"Content blocked: {finish_reason}")
 
-                    raise ValueError("No text in response")
+                    raise ValueError(f"No text in response: {response}")
 
                 extracted_text = response.text.strip()
 

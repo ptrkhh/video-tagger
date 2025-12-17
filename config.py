@@ -10,12 +10,11 @@ class Config:
     output_directory: str = "output"
 
     gcp_project_id: str = "ubm-gen-ai"
-    gcp_region: str = "us-central1"
     gcp_credentials_path: str = "credentials/gsa.json"
 
-    model_name: str = "gemini-2.5-flash"
+    model_name: str = "gemini-3-pro-preview"
     prompt_file_path: str = "prompt.txt"
-    use_ai_to_get_username: bool = False
+    use_ai_to_get_username: bool = True
 
     max_workers: int = 1
 
@@ -39,10 +38,16 @@ class Config:
     generic_source_keywords: ClassVar[list[str]] = ["img", "image", "pic", "photo", "video", "vid", "screenshot"]
 
     client = Client(
-        location=gcp_region,
+        location="global",
         project=gcp_project_id,
         vertexai=True,
     )
+    client_us_central_1 = Client(
+        location="us-central1",
+        project=gcp_project_id,
+        vertexai=True,
+    )
+
 
     def get_all_supported_media_extensions(self) -> list[str]:
         return self.supported_video_extensions + self.supported_image_extensions
