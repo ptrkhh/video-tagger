@@ -46,7 +46,7 @@ class MediaTagger:
                     try:
                         exception = future.exception()
                         if exception:
-                            print(f"\n✗ Exception processing {file_path.name}: {exception}\n")
+                            tqdm.write(f"\n✗ Exception processing {file_path.name}: {exception}\n")
                             fail_count += 1
                         elif future.result():
                             success_count += 1
@@ -54,7 +54,7 @@ class MediaTagger:
                             fail_count += 1
 
                     except Exception as error:
-                        print(f"\n✗ Unexpected error retrieving result for {file_path.name}: {error}\n")
+                        tqdm.write(f"\n✗ Unexpected error retrieving result for {file_path.name}: {error}\n")
                         fail_count += 1
 
                     finally:

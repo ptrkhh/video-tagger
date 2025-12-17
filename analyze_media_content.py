@@ -69,7 +69,7 @@ ANALYZE THIS MEDIA AND OUTPUT KEYWORDS:
     for attempt in range(max_retries):
         try:
             response = config.application_config.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3-pro-preview",
                 contents=[media_part, prompt],
                 config=GenerateContentConfig(
                     temperature=0.8,
